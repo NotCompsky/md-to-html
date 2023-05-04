@@ -226,7 +226,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 			case '<': {
 				const char* itr = markdown;
 				const char* const tagname_start = itr; // for <something this is at the 's' place
-				if ((itr[0]=='!') and (itr[1]=='-') and (itr[2]=='-')){
+				if ((itr[0]=='!') and (itr[1]=='-') and (itr[2]=='-')){ // <!-- -->
 					itr += 6;
 					while(
 						(itr[-3]!='-') or (itr[-2]!='-') or (itr[-1]!='>')
@@ -234,15 +234,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						++itr;
 					markdown = itr;
 					copy_this_char_into_html = false;
-				} else if (
-					(itr[0]=='s') and
-					(itr[1]=='c') and
-					(itr[2]=='r') and
-					(itr[3]=='i') and
-					(itr[4]=='p') and
-					(itr[5]=='t') and
-					((itr[6]=='>') or (itr[6]==' '))
-				){
+				} else if (  (itr[0]=='s') and (itr[1]=='c') and (itr[2]=='r') and (itr[3]=='i') and (itr[4]=='p') and (itr[5]=='t') and ((itr[6]=='>') or (itr[6]==' '))  ){ // <script></script>
 					itr += 7+9;
 					while(
 						(itr[-9]!='<') or
@@ -259,14 +251,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					compsky::asciify::asciify(dest_itr, mkview(markdown-1,itr));
 					markdown = itr;
 					copy_this_char_into_html = false;
-				} else if (
-					(itr[0]=='s') and
-					(itr[1]=='t') and
-					(itr[2]=='y') and
-					(itr[3]=='l') and
-					(itr[4]=='e') and
-					((itr[5]=='>') or (itr[5]==' '))
-				){
+				} else if (  (itr[0]=='s') and (itr[1]=='t') and (itr[2]=='y') and (itr[3]=='l') and (itr[4]=='e') and ((itr[5]=='>') or (itr[5]==' '))  ){ // <style></style>
 					itr += 6+8;
 					while(
 						(itr[-8]!='<') or
@@ -325,22 +310,6 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 								itr = itr2+1+1;
 							}
 						}
-					}
-				} else if ((itr[0] == '!') and (itr[1] == '-') and (itr[2] == '-')){
-					itr += 3;
-					while(true){
-						if ((itr[0] == '-') and (itr[1] == '-') and (itr[2] == '>')){
-							break;
-						}
-						if (unlikely(itr[0] == 0))
-							break;
-						++itr;
-					}
-					if (unlikely(itr[0] == 0)){
-						log(markdown_buf, markdown, "HTML comment opened but not closed", markdown, compsky::utils::ptrdiff(itr-1,markdown));
-					} else {
-						markdown = itr+2 + 1;
-						copy_this_char_into_html = false;
 					}
 				}
 				break;
