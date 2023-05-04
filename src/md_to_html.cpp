@@ -202,8 +202,8 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					compsky::asciify::asciify(dest_itr, "</a>");
 					markdown = is_in_anchor_which_ends_at;
 					copy_this_char_into_html = false;
-					// is_in_anchor_whose_title_ends_at = nullptr; No need
-					// is_in_anchor_which_ends_at = nullptr; No need
+					is_in_anchor_whose_title_ends_at = nullptr;
+					is_in_anchor_which_ends_at = nullptr;
 				}
 				break;
 			case '[': {
@@ -211,10 +211,14 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				if ((likely(title_end != markdown-1)) and (likely(title_end[2] == '('))){
 					const char* const link_end = str_if_ends_with__before(title_end+3, ')', '\n');
 					if (likely(link_end != title_end+3-1)){
-						compsky::asciify::asciify(dest_itr, "<a href=\"", mkview(title_end+3,link_end+1), "\">");
-						is_in_anchor_whose_title_ends_at = title_end+2;
-						is_in_anchor_which_ends_at = link_end + 2;
-						copy_this_char_into_html = false;
+						if (likely(is_in_anchor_whose_title_ends_at == nullptr)){
+							compsky::asciify::asciify(dest_itr, "<a href=\"", mkview(title_end+3,link_end+1), "\">");
+							is_in_anchor_whose_title_ends_at = title_end+2;
+							is_in_anchor_which_ends_at = link_end + 2;
+							copy_this_char_into_html = false;
+						} else {
+							log(markdown_buf, markdown-1, "[link]() within [link]()", markdown-1, compsky::utils::ptrdiff(link_end+1,markdown-1));
+						}
 					}
 				}
 				break;
