@@ -118,7 +118,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	std::string_view titlestr;
 	if ((markdown[0]=='-')and(markdown[1]=='-')and(markdown[2]=='-')and(markdown[3]=='\n')){
 		// Skip RMD information part
-		markdown += 7;
+		markdown += 8;
 		while(  (markdown[-4]!='-') or (markdown[-3]!='-') or (markdown[-2]!='-') or (markdown[-1]!='\n')  ){
 			if (
 				(markdown[-4] == 't') and
@@ -130,7 +130,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				(markdown[ 2] == ' ') and
 				(markdown[ 3] == '"')
 			){
-				markdown += 3;
+				markdown += 4;
 				const char* const title_start = markdown;
 				while(*markdown != '"')
 					++markdown;
