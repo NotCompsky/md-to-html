@@ -5,6 +5,7 @@
 #include <compsky/utils/ptrdiff.hpp>
 #include <compsky/macros/likely.hpp>
 #include <compsky/asciify/asciify.hpp>
+#include <vector>
 
 
 extern bool PRINT_DEBUG;
@@ -22,6 +23,30 @@ constexpr bool using_knitr_output = true;
 
 const std::string_view mkview(const char* const start,  const char* const end){
 	return std::string_view(start, compsky::utils::ptrdiff(end,start));
+}
+
+
+constexpr
+bool str_eq(const char* a,  const char* b){
+	bool rc = true;
+	while(true){
+		rc &= (*a == *b);
+		if ((*a)*(*b) == 0)
+			break;
+		++a;
+		++b;
+	}
+	return rc;
+}
+constexpr
+bool str_eq(const char* a,  const std::string_view& b){
+	bool rc = true;
+	for (std::size_t i = 0;  i < b.size();  ++i){
+		rc &= (a[i] == b.at(i));
+		if (*a == 0)
+			break;
+	}
+	return rc;
 }
 
 
@@ -156,6 +181,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	bool is_in_blockquote = false;
 	const char* is_in_anchor_whose_title_ends_at = nullptr;
 	const char* is_in_anchor_which_ends_at = nullptr;
+	std::vector<std::string_view> open_dom_tag_names;
 	while (true){
 		if (PRINT_DEBUG){
 			printf("%s\n", char2humanvis(*markdown)); fflush(stdout);
@@ -274,42 +300,44 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						(*itr == '-')
 					)
 						++itr;
-					if ((itr[-1] == '-') or ((*itr != '>') and (*itr != ' ')))
-						continue;
-					const std::size_t tagname_len = compsky::utils::ptrdiff(itr,tagname_start);
-					if (*itr != '>'){
-						while((*itr != 0) and (*itr != '\n') and (*itr != '>'))
-							++itr;
-					}
-					if (*itr == '>'){
-						++itr;
-						while(true){
-							const char* const itr2 = str_if_ends_with__before(itr, '<', '\n'); // __before '\n' means that HTML is only direct-pasted if it is in one line
-							const char* tagname2_start;
-							if (unlikely(itr2 == itr-1))
-								break;
-							bool matches = false;
-							if (itr2[2] == '/'){
-								// WARNING: Not proper HTML parsing! Doesn't account for possibility of nested HTML tags (but could be implemented by keeping track of depth of outer tag) # TODO
-								tagname2_start = itr2+3;
-								matches = true;
-								for(unsigned i = 0;  i < tagname_len;  ++i){
-									matches &= (tagname2_start[i] == tagname_start[i]);
-								}
-								matches &= (tagname2_start[tagname_len] == '>');
-							}
-							if (matches){
-								if ((tagname_start[0]=='b') and (tagname_start[1]=='>')){
-									fprintf(stderr, "<b>: %.*s\n", (int)compsky::utils::ptrdiff(tagname2_start-2,tagname_start+2), tagname_start+2);
-								}
-								compsky::asciify::asciify(dest_itr, mkview(tagname_start-1,tagname2_start+tagname_len+1));
-								markdown = tagname2_start+tagname_len + 1;
-								copy_this_char_into_html = false;
-								break;
-							} else {
-								itr = itr2+1+1;
-							}
+					if ((itr[-1] != '-') and ((*itr == '>') or (*itr == ' '))){
+						const std::size_t tagname_len = compsky::utils::ptrdiff(itr,tagname_start);
+						
+						if (*itr != '>'){
+							while((*itr != 0) and (*itr != '\n') and (*itr != '>'))
+								++itr;
 						}
+						if (likely(*itr == '>')){
+							if (itr[-1] != '/'){
+								if (not (
+									((tagname_start[0] == 'b') and (tagname_start[1] == 'r') and (tagname_len == 2))
+								)){
+									open_dom_tag_names.emplace_back(tagname_start, tagname_len);
+								}
+							}
+							++itr;
+							compsky::asciify::asciify(dest_itr, mkview(markdown-1,itr));
+							markdown = itr;
+							copy_this_char_into_html = false;
+						}
+					}
+				} else if (*itr == '/'){
+					const std::string_view last_open_tagname = open_dom_tag_names[open_dom_tag_names.size()-1];
+					if (str_eq(itr+1, last_open_tagname) and (itr[1+last_open_tagname.size()] == '>')){
+						compsky::asciify::asciify(dest_itr, '<', '/', last_open_tagname, '>');
+						markdown = itr+1 + last_open_tagname.size() + 1;
+						open_dom_tag_names.pop_back();
+						copy_this_char_into_html = false;
+					} else {
+						int itr_sz = 0;
+						while(
+							((itr[itr_sz+1] >= 'a') and (itr[itr_sz+1] <= 'z')) or
+							(itr[itr_sz+1] == '-') or
+							((itr[itr_sz+1] >= 'A') and (itr[itr_sz+1] <= 'Z'))
+						)
+							++itr_sz;
+						fprintf(stderr, "Expecting </%.*s> but received </%.*s>\n%.200s\n", (int)last_open_tagname.size(), last_open_tagname.data(), itr_sz, itr+1,  markdown-190); fflush(stdout);
+						abort();
 					}
 				}
 				break;
@@ -508,6 +536,12 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 			break;
 		if (copy_this_char_into_html)
 			compsky::asciify::asciify(dest_itr, markdown[-1]);
+	}
+	if (open_dom_tag_names.size() != 0){
+		for (unsigned i = 0;  i < open_dom_tag_names.size();  ++i){
+			const std::string_view s = open_dom_tag_names[open_dom_tag_names.size()-i-1];
+			fprintf(stderr, "Unclosed tag: %.*s\n", (int)s.size(), s.data());
+		}
 	}
 	compsky::asciify::asciify(dest_itr, "</body></html>");
 	return dest_itr;
