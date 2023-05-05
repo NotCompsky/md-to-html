@@ -19,6 +19,7 @@ constexpr const char* emphasis_close[2] = {
 	"</b>"
 };
 constexpr bool using_knitr_output = true;
+constexpr std::string_view horizontal_rule = "<hr/>";
 
 
 const std::string_view mkview(const char* const start,  const char* const end){
@@ -177,6 +178,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		"<body>\n"
 	);
 	bool is_in_blockquote = false;
+	bool is_open_paragraph = false;
 	const char* is_in_anchor_whose_title_ends_at = nullptr;
 	const char* is_in_anchor_which_ends_at = nullptr;
 	std::vector<std::string_view> open_dom_tag_names;
@@ -187,16 +189,32 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		++markdown;
 		bool copy_this_char_into_html = true;
 		bool should_break_out = false;
-		switch(markdown[-1]){
+		char current_c = markdown[-1];
+		switch(current_c){
 			case 0:
 			case '\n': {
 				if (is_in_blockquote){
 					compsky::asciify::asciify(dest_itr, "</blockquote>");
 					is_in_blockquote = false;
 				}
+				if (is_open_paragraph){
+					if (markdown[-2]=='\n')
+						--dest_itr;
+					if (
+						(markdown[-1]==0) or
+						(markdown[-2]=='\n')
+					){
+						compsky::asciify::asciify(dest_itr, "</p>");
+						is_open_paragraph = false;
+					}
+					if (markdown[-2]=='\n')
+						compsky::asciify::asciify(dest_itr, '\n');
+				}
 				if (markdown[-1] == 0){
 					should_break_out = true;
 				}
+				compsky::asciify::asciify(dest_itr, '\n');
+				copy_this_char_into_html = false;
 				break;
 			}
 			case '#': {
@@ -366,13 +384,13 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				}
 				const char* const after_asterisks = itr;
 				if ((n_asterisks_l == 3) and was_newline_at(markdown_buf, markdown-2) and (*after_asterisks == '\n')){
-					compsky::asciify::asciify(dest_itr, "<hr/>");
+					compsky::asciify::asciify(dest_itr, horizontal_rule);
 					markdown = itr+1;
 					copy_this_char_into_html = false;
 				} else if ((n_asterisks_l == 1) and (*after_asterisks == ' ')){
-					compsky::asciify::asciify(dest_itr, '-');
 					markdown = itr;
-					copy_this_char_into_html = false;
+					// copy_this_char_into_html = true;
+					current_c = '-';
 				} else {
 					if ((*after_asterisks != ' ') and (n_asterisks_l <= emphasis_max)){
 						const char* const start_of_emphasised_text = itr;
@@ -532,8 +550,16 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		}
 		if (unlikely(should_break_out))
 			break;
-		if (copy_this_char_into_html)
-			compsky::asciify::asciify(dest_itr, markdown[-1]);
+		if (copy_this_char_into_html){
+			if (
+				((markdown[-2] == '\n') and (markdown[-3] == '\n')) or
+				(markdown-2 == markdown_buf)
+			){
+				compsky::asciify::asciify(dest_itr, "<p>");
+				is_open_paragraph = true;
+			}
+			compsky::asciify::asciify(dest_itr, current_c);
+		}
 	}
 	if (open_dom_tag_names.size() != 0){
 		for (unsigned i = 0;  i < open_dom_tag_names.size();  ++i){
