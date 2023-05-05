@@ -179,9 +179,11 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	);
 	bool is_in_blockquote = false;
 	bool is_open_paragraph = false;
+	bool is_in_unordered_list = false;
 	const char* is_in_anchor_whose_title_ends_at = nullptr;
 	const char* is_in_anchor_which_ends_at = nullptr;
 	std::vector<std::string_view> open_dom_tag_names;
+	unsigned line_began_with_n_spaces = 0;
 	while (true){
 		if (PRINT_DEBUG){
 			printf("%s\n", char2humanvis(*markdown)); fflush(stdout);
@@ -197,15 +199,22 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					compsky::asciify::asciify(dest_itr, "</blockquote>");
 					is_in_blockquote = false;
 				}
-				if (is_open_paragraph){
+				if (is_open_paragraph or is_in_unordered_list){
+					if (is_open_paragraph and is_in_unordered_list){
+						fprintf(stderr, "is_open_paragraph AND is_in_unordered_list\n%.200s", markdown-100); fflush(stderr);
+					}
 					if (markdown[-2]=='\n')
 						--dest_itr;
 					if (
 						(markdown[-1]==0) or
 						(markdown[-2]=='\n')
 					){
-						compsky::asciify::asciify(dest_itr, "</p>");
+						compsky::asciify::asciify(
+							dest_itr,
+							is_in_unordered_list ? "</li></ul>" : "</p>"
+						);
 						is_open_paragraph = false;
+						is_in_unordered_list = false;
 					}
 					if (markdown[-2]=='\n')
 						compsky::asciify::asciify(dest_itr, '\n');
@@ -215,6 +224,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				}
 				compsky::asciify::asciify(dest_itr, '\n');
 				copy_this_char_into_html = false;
+				line_began_with_n_spaces = 0;
 				break;
 			}
 			case '#': {
@@ -387,10 +397,23 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					compsky::asciify::asciify(dest_itr, horizontal_rule);
 					markdown = itr+1;
 					copy_this_char_into_html = false;
-				} else if ((n_asterisks_l == 1) and (*after_asterisks == ' ')){
-					markdown = itr;
-					// copy_this_char_into_html = true;
-					current_c = '-';
+				} else if (
+					(n_asterisks_l == 1) and
+					(*after_asterisks == ' ') and
+					((markdown-2-line_began_with_n_spaces >= markdown_buf) and (*(markdown-2-line_began_with_n_spaces) == '\n'))
+				){
+					markdown = itr+1; // Avoid the space
+					copy_this_char_into_html = false;
+					dest_itr -= (1 + line_began_with_n_spaces);
+					compsky::asciify::asciify(
+						dest_itr,
+						is_in_unordered_list ? "</li>\n<li>" : "<ul>\n<li>"
+					);
+					is_in_unordered_list = true;
+					while(line_began_with_n_spaces != 0){
+						compsky::asciify::asciify(dest_itr, ' ');
+						--line_began_with_n_spaces;
+					}
 				} else {
 					if ((*after_asterisks != ' ') and (n_asterisks_l <= emphasis_max)){
 						const char* const start_of_emphasised_text = itr;
@@ -543,6 +566,31 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						const char* itr = markdown;
 						log(markdown_buf, itr, "Bad escape", markdown-50, 101);
 						abort();
+					}
+				}
+				break;
+			}
+			case ' ': {
+				if (was_newline_at(markdown_buf, markdown-2)){
+					const char* itr = markdown;
+					while((*itr == ' '))
+						++itr;
+					line_began_with_n_spaces = 1 + compsky::utils::ptrdiff(itr,markdown);
+					if (*itr == '\n'){
+						fprintf(stderr, "WARNING: Empty line containing %u whitespaces\n", line_began_with_n_spaces);
+						line_began_with_n_spaces = 0;
+						markdown = itr;
+					} else {
+						if (not is_in_unordered_list){
+							if (itr[0] != '<')
+								fprintf(stderr, "ERROR: Line starts with ' ' and not in <ul>: >>>%.100s<<<\n", markdown-1);
+						} else {
+							if (unlikely((itr[0] != '*') or (itr[1] != ' '))){
+								fprintf(stderr, "ERROR: Line starts with ' ' and is after <ul> but no '* ': >>>%.100s<<<\n", markdown-1);
+							} else {
+								// copy_this_char_into_html = true; because line_began_with_n_spaces already deals with this
+							}
+						}
 					}
 				}
 				break;
