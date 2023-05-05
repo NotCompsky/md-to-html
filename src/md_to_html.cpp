@@ -200,19 +200,35 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					is_in_blockquote = false;
 				}
 				if (is_open_paragraph or is_in_unordered_list){
-					if (is_open_paragraph and is_in_unordered_list){
-						fprintf(stderr, "is_open_paragraph AND is_in_unordered_list\n%.200s", markdown-100); fflush(stderr);
-					}
 					if (markdown[-2]=='\n')
 						--dest_itr;
 					if (
 						(markdown[-1]==0) or
 						(markdown[-2]=='\n')
 					){
-						compsky::asciify::asciify(
-							dest_itr,
-							is_in_unordered_list ? "</li></ul>" : "</p>"
-						);
+						if (is_in_unordered_list){
+							compsky::asciify::asciify(
+								dest_itr,
+								"</li></ul>"
+							);
+						}
+						if (is_open_paragraph){
+							char* _itr = dest_itr;
+							while((*_itr == ' ') or (*_itr == '\n'))
+								--_itr;
+							if (
+								(_itr[-2] == '<') and
+								(_itr[-1] == 'p') and
+								(_itr[ 0] == '>')
+							){
+								dest_itr = _itr - 2; // Remove <p>
+							} else {
+								compsky::asciify::asciify(
+									dest_itr,
+									"</p>"
+								);
+							}
+						}
 						is_open_paragraph = false;
 						is_in_unordered_list = false;
 					}
@@ -600,7 +616,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		}
 		if (unlikely(should_break_out))
 			break;
-		if (copy_this_char_into_html){
+		if (true){
 			if (
 				((markdown[-2] == '\n') and (markdown[-3] == '\n')) or
 				(markdown-2 == markdown_buf)
@@ -608,6 +624,8 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				compsky::asciify::asciify(dest_itr, "<p>");
 				is_open_paragraph = true;
 			}
+		}
+		if (copy_this_char_into_html){
 			compsky::asciify::asciify(dest_itr, current_c);
 		}
 	}
