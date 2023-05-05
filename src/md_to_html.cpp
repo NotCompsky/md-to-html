@@ -191,7 +191,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		++markdown;
 		bool copy_this_char_into_html = true;
 		bool should_break_out = false;
-		char current_c = markdown[-1];
+		const char current_c = markdown[-1];
 		switch(current_c){
 			case 0:
 			case '\n': {
@@ -365,6 +365,8 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						fprintf(stderr, "Expecting </%.*s> but received </%.*s>\n%.200s\n", (int)last_open_tagname.size(), last_open_tagname.data(), itr_sz, itr+1,  markdown-190); fflush(stdout);
 						abort();
 					}
+				} else {
+					fprintf(stderr, "Treating < as NOT a tag: %.70s\n", markdown-35);
 				}
 				break;
 			}
@@ -614,6 +616,8 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 			const std::string_view s = open_dom_tag_names[open_dom_tag_names.size()-i-1];
 			fprintf(stderr, "Unclosed tag: %.*s\n", (int)s.size(), s.data());
 		}
+		fflush(stderr);
+		abort();
 	}
 	compsky::asciify::asciify(dest_itr, "</body></html>");
 	return dest_itr;
