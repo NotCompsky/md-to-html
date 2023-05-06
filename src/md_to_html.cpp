@@ -6,6 +6,7 @@
 #include <compsky/macros/likely.hpp>
 #include <compsky/asciify/asciify.hpp>
 #include <vector>
+#include "utils.hpp"
 
 
 extern bool PRINT_DEBUG;
@@ -22,111 +23,88 @@ constexpr bool using_knitr_output = true;
 constexpr std::string_view horizontal_rule = "<hr/>";
 
 
-const std::string_view mkview(const char* const start,  const char* const end){
-	return std::string_view(start, compsky::utils::ptrdiff(end,start));
-}
-
-
-constexpr
-bool str_eq(const char* a,  const char* b){
-	bool rc = true;
-	while(true){
-		rc &= (*a == *b);
-		if ((*a)*(*b) == 0)
-			break;
-		++a;
-		++b;
-	}
-	return rc;
-}
-constexpr
-bool str_eq(const char* a,  const std::string_view& b){
-	bool rc = true;
-	for (std::size_t i = 0;  i < b.size();  ++i){
-		rc &= (a[i] == b.at(i));
-		if (*a == 0)
-			break;
-	}
-	return rc;
-}
-
-
-const char* str_if_ends_with__before(const char* const init,  const char d,  const char before1){
-	// e.g. (init,d,before1)==("foo bar]",']','\n') => position before ']'
-	const char* itr = init;
-	while(*itr != 0){
-		if (*itr == before1){
-			break;
+void close_paragraph_if_nonempty_already_open(char*& dest_itr,  const bool is_open_paragraph){
+	if (is_open_paragraph){
+		if ((dest_itr[-3] == '<') and (dest_itr[-2] == 'p') and (dest_itr[-1] == '>')){
+			dest_itr -= 3;
+		} else {
+			compsky::asciify::asciify(dest_itr, "</p>");
 		}
-		if (*itr == d){
-			return itr-1;
-		}
-		++itr;
 	}
-	return init-1;
-}
-const char* str_if_ends_with__before__pair_up_with(const char* const init,  const char d,  const char before1,  const char pair_with){
-	// e.g. (init,d,before1)==("foo [bar] ree]",']','\n','[') => position after "ree" before ']'
-	const char* itr = init;
-	unsigned n_paired = 0;
-	while(*itr != 0){
-		if (*itr == before1){
-			break;
-		}
-		if (*itr == pair_with)
-			++n_paired;
-		if (*itr == d){
-			if (n_paired == 0)
-				return itr-1;
-			else
-				--n_paired;
-		}
-		++itr;
-	}
-	return init-1;
-}
-
-const char* str_if_ends_with(const char* const init,  const char d){
-	const char* itr = init;
-	while(*itr != 0){
-		if (*itr == d){
-			return itr-1;
-		}
-		++itr;
-	}
-	return init-1;
-}
-
-const char* str_if_ends_with3(const char* const init,  const char d1,  const char d2,  const char d3){
-	const char* itr = init;
-	while(*itr != 0){
-		if ((itr[0] == d1) and (itr[1] == d2) and (itr[2] == d3)){
-			return itr-1;
-		}
-		++itr;
-	}
-	return init-1;
 }
 
 void log(const char* const markdown_buf,  const char* const markdown_itr,  const char* const msg,  const char* const msg_var,  const int msg_var_len){
 	fprintf(stderr, "WARNING: %s at %lu: %.*s\n", msg, compsky::utils::ptrdiff(markdown_itr,markdown_buf), msg_var_len, msg_var);
 }
 
-const char* char2humanvis(const char c){
-	static char buf[2] = {0,0};
-	switch(c){
-		case '\n':
-			return "\\n";
-		case ' ':
-			return "[SPACE]";
-		default:
-			buf[0] = c;
-			return buf;
+bool is_opening_of_some_node(const char* markdown,  const std::vector<std::string_view>& tag_names){
+	if (markdown[0] == '<'){
+		for (const std::string_view& tagname : tag_names){
+			if (str_eq(markdown+1, tagname)){
+				const char endchar = markdown[1+tagname.size()];
+				if ((endchar=='>') or (endchar==' '))
+					return true;
+			}
+		}
 	}
+	return false;
+}
+bool is_some_node(const std::string_view& tag_name,  const std::vector<std::string_view>& tag_names){
+	for (const std::string_view& tagname : tag_names){
+		if (str_eq(tag_name, tagname))
+			return true;
+	}
+	return false;
 }
 
-bool was_newline_at(const char* const markdown_buf,  const char* const ptr){
-	return ((markdown_buf==ptr+1) or (*ptr == '\n'));
+void add_tagnames_to_ls(const char* const itr,  std::vector<std::string_view>& tag_names){
+	const char* _enddd = itr;
+	const char* _start = itr-1;
+	while(*_start != '}'){
+		--_start;
+	}
+	fprintf(stderr, "FOUND %.*s\n", (int)compsky::utils::ptrdiff(_enddd,_start), _start);
+	while(_start != _enddd){
+		++_start;
+		switch(*_start){
+			case ' ':
+			case '\n':
+			case '\t':
+			case ',':
+			case '{':
+				break;
+			case '/':
+				if (_start[1] == '*'){
+					while(  (_start[-1] != '*') or (_start[0] != '/')  )
+						++_start;
+				} else {
+					fprintf(stderr, "WARNING: Unexpected '/' in <style>display:block; thingie within: %.20s\n", _start-10);
+				}
+				break;
+			case '#':
+			case '.':
+				while((*_start != ',') and (_start != _enddd))
+					++_start;
+				--_start;
+				break;
+			case 'a' ... 'z': {
+				const char* _tagname_start = _start;
+				while(((*_start >= 'a') and (*_start <= 'z')) or (*_start == '-'))
+					++_start;
+				if (
+					(*_start == ',') or
+					((_start[0] == ' ') and (_start[1] == '{')) or
+					(_start[0] == '{')
+				){
+					fprintf(stderr, "ADDED %.*s\n", (int)compsky::utils::ptrdiff(_start,_tagname_start), _tagname_start);
+					tag_names.emplace_back(_tagname_start, compsky::utils::ptrdiff(_start,_tagname_start));
+				}
+				break;
+			}
+			default:
+				fprintf(stderr, "Encountered unexpected <style>display:block; thingie: %c within: %.20s\n", *_start, _start-10);
+		}
+	}
 }
 
 char* md_to_html(const char* const filepath,  char* const dest_buf){
@@ -179,11 +157,54 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	);
 	bool is_in_blockquote = false;
 	bool is_open_paragraph = false;
+	unsigned dom_tag_depth_for_opening_of_paragraph = 0;
 	bool is_in_unordered_list = false;
 	const char* is_in_anchor_whose_title_ends_at = nullptr;
 	const char* is_in_anchor_which_ends_at = nullptr;
 	std::vector<std::string_view> open_dom_tag_names;
 	unsigned line_began_with_n_spaces = 0;
+	std::vector<std::string_view> noninline_div_tag_names;
+	std::vector<std::string_view> inline_div_tag_names;
+	std::vector<std::string_view> warned_about_tag_names;
+	noninline_div_tag_names.emplace_back("br");
+	noninline_div_tag_names.emplace_back("hr");
+	noninline_div_tag_names.emplace_back("div");
+	noninline_div_tag_names.emplace_back("script");
+	noninline_div_tag_names.emplace_back("style");
+	noninline_div_tag_names.emplace_back("h1");
+	noninline_div_tag_names.emplace_back("h2");
+	noninline_div_tag_names.emplace_back("h3");
+	noninline_div_tag_names.emplace_back("h4");
+	noninline_div_tag_names.emplace_back("h5");
+	noninline_div_tag_names.emplace_back("h6");
+	noninline_div_tag_names.emplace_back("h7");
+	noninline_div_tag_names.emplace_back("h8");
+	noninline_div_tag_names.emplace_back("h9");
+	noninline_div_tag_names.emplace_back("h10");
+	noninline_div_tag_names.emplace_back("blockquote");
+	noninline_div_tag_names.emplace_back("ul");
+	noninline_div_tag_names.emplace_back("li");
+	noninline_div_tag_names.emplace_back("canvas");
+	noninline_div_tag_names.emplace_back("button");
+	noninline_div_tag_names.emplace_back("p");
+	noninline_div_tag_names.emplace_back("table");
+	noninline_div_tag_names.emplace_back("tr");
+	inline_div_tag_names.emplace_back("svg");
+	inline_div_tag_names.emplace_back("circle");
+	inline_div_tag_names.emplace_back("path");
+	inline_div_tag_names.emplace_back("img");
+	inline_div_tag_names.emplace_back("td");
+	inline_div_tag_names.emplace_back("th");
+	inline_div_tag_names.emplace_back("time");
+	inline_div_tag_names.emplace_back("input");
+	inline_div_tag_names.emplace_back("highlighttagnamehere"); // TODO
+	inline_div_tag_names.emplace_back("a");
+	inline_div_tag_names.emplace_back("span");
+	inline_div_tag_names.emplace_back("q");
+	inline_div_tag_names.emplace_back("em");
+	inline_div_tag_names.emplace_back("i");
+	inline_div_tag_names.emplace_back("b");
+	inline_div_tag_names.emplace_back("strong");
 	while (true){
 		if (PRINT_DEBUG){
 			printf("%s\n", char2humanvis(*markdown)); fflush(stdout);
@@ -191,6 +212,19 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		++markdown;
 		bool copy_this_char_into_html = true;
 		bool should_break_out = false;
+		if (
+			((markdown[-2] == '\n') and (markdown[-3] == '\n')) or
+			(markdown-2 == markdown_buf)
+		){
+			if (not is_opening_of_some_node(markdown-1, noninline_div_tag_names)){
+				compsky::asciify::asciify(dest_itr, "<p>");
+				if (unlikely(is_open_paragraph)){
+					fprintf(stderr, "ERROR: is_open_paragraph already true: %.100s\n", markdown-50);
+				}
+				is_open_paragraph = true;
+				dom_tag_depth_for_opening_of_paragraph = open_dom_tag_names.size();
+			}
+		}
 		const char current_c = markdown[-1];
 		switch(current_c){
 			case 0:
@@ -245,6 +279,11 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 			}
 			case '#': {
 				if (was_newline_at(markdown_buf, markdown-2)){
+					if (is_open_paragraph){
+						if ((dest_itr[-3] == '<') and (dest_itr[-2] == 'p') and (dest_itr[-1] == '>'))
+							dest_itr -= 3;
+						is_open_paragraph = false;
+					}
 					unsigned num_hashes = 1;
 					const char* itr = markdown;
 					while (*itr == '#'){
@@ -330,8 +369,80 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						(itr[-3]!='l') or
 						(itr[-2]!='e') or
 						(itr[-1]!='>')
-					)
+					){
+						if (unlikely(
+							(itr[-17]=='{') and
+							(itr[-16]=='\n') and
+							(itr[-15]=='\t') and
+							(itr[-14]=='d') and
+							(itr[-13]=='i') and
+							(itr[-12]=='s') and
+							(itr[-11]=='p') and
+							(itr[-10]=='l') and
+							(itr[-9 ]=='a') and
+							(itr[-8 ]=='y') and
+							(itr[-7 ]==':') and
+							(itr[-6 ]=='b') and
+							(itr[-5 ]=='l') and
+							(itr[-4 ]=='o') and
+							(itr[-3 ]=='c') and
+							(itr[-2 ]=='k') and
+							(itr[-1 ]==';')
+						)){ // display:block; // TODO: Improve? but why bother if it works for rpill
+							add_tagnames_to_ls(itr-17, noninline_div_tag_names);
+						}
+						if (unlikely(
+							(itr[-18]=='{') and
+							(itr[-17]=='\n') and
+							(itr[-16]=='\t') and
+							(itr[-15]=='d') and
+							(itr[-14]=='i') and
+							(itr[-13]=='s') and
+							(itr[-12]=='p') and
+							(itr[-11]=='l') and
+							(itr[-10]=='a') and
+							(itr[-9 ]=='y') and
+							(itr[-8 ]==':') and
+							(itr[-7 ]=='i') and
+							(itr[-6 ]=='n') and
+							(itr[-5 ]=='l') and
+							(itr[-4 ]=='i') and
+							(itr[-3 ]=='n') and
+							(itr[-2 ]=='e') and
+							(itr[-1 ]==';')
+						)){ // display:inline; // TODO: Improve? but why bother if it works for rpill
+							add_tagnames_to_ls(itr-18, inline_div_tag_names);
+						}
+						if (unlikely(
+							(itr[-24]=='{') and
+							(itr[-23]=='\n') and
+							(itr[-22]=='\t') and
+							(itr[-21]=='d') and
+							(itr[-20]=='i') and
+							(itr[-19]=='s') and
+							(itr[-18]=='p') and
+							(itr[-17]=='l') and
+							(itr[-16]=='a') and
+							(itr[-15]=='y') and
+							(itr[-14]==':') and
+							(itr[-13]=='i') and
+							(itr[-12]=='n') and
+							(itr[-11]=='l') and
+							(itr[-10]=='i') and
+							(itr[-9 ]=='n') and
+							(itr[-8 ]=='e') and
+							(itr[-7 ]=='-') and
+							(itr[-6 ]=='b') and
+							(itr[-5 ]=='l') and
+							(itr[-4 ]=='o') and
+							(itr[-3 ]=='c') and
+							(itr[-2 ]=='k') and
+							(itr[-1 ]==';')
+						)){ // display:inline-block; // TODO: Improve? but why bother if it works for rpill
+							add_tagnames_to_ls(itr-24, inline_div_tag_names);
+						}
 						++itr;
+					}
 					compsky::asciify::asciify(dest_itr, mkview(markdown-1,itr));
 					markdown = itr;
 					copy_this_char_into_html = false;
@@ -358,6 +469,14 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 								}
 							}
 							++itr;
+							
+							if (not (is_some_node(std::string_view(tagname_start,tagname_len), noninline_div_tag_names) or is_some_node(std::string_view(tagname_start,tagname_len), inline_div_tag_names))){
+								if (not is_some_node(std::string_view(tagname_start,tagname_len), warned_about_tag_names)){
+									fprintf(stderr, "WARNING: Node not given inline or block CSS rule: %.*s\n", (int)tagname_len, tagname_start);
+									warned_about_tag_names.emplace_back(tagname_start,tagname_len);
+								}
+							}
+							
 							compsky::asciify::asciify(dest_itr, mkview(markdown-1,itr));
 							markdown = itr;
 							copy_this_char_into_html = false;
@@ -366,10 +485,24 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				} else if (*itr == '/'){
 					const std::string_view last_open_tagname = open_dom_tag_names[open_dom_tag_names.size()-1];
 					if (str_eq(itr+1, last_open_tagname) and (itr[1+last_open_tagname.size()] == '>')){
+						if (is_open_paragraph){
+							if (open_dom_tag_names.size() == dom_tag_depth_for_opening_of_paragraph){
+								close_paragraph_if_nonempty_already_open(dest_itr, is_open_paragraph);
+								is_open_paragraph = false;
+							}
+						}
+						
 						compsky::asciify::asciify(dest_itr, '<', '/', last_open_tagname, '>');
 						markdown = itr+1 + last_open_tagname.size() + 1;
 						open_dom_tag_names.pop_back();
 						copy_this_char_into_html = false;
+						
+						if (is_open_paragraph){
+							if (open_dom_tag_names.size() == dom_tag_depth_for_opening_of_paragraph){
+								compsky::asciify::asciify(dest_itr, "</p>");
+								is_open_paragraph = false;
+							}
+						}
 					} else {
 						int itr_sz = 0;
 						while(
@@ -422,7 +555,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				){
 					markdown = itr+1; // Avoid the space
 					copy_this_char_into_html = false;
-					dest_itr -= (1 + line_began_with_n_spaces);
+					dest_itr -= line_began_with_n_spaces;
 					compsky::asciify::asciify(
 						dest_itr,
 						is_in_unordered_list ? "</li>\n<li>" : "<ul>\n<li>"
@@ -616,15 +749,6 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		}
 		if (unlikely(should_break_out))
 			break;
-		if (true){
-			if (
-				((markdown[-2] == '\n') and (markdown[-3] == '\n')) or
-				(markdown-2 == markdown_buf)
-			){
-				compsky::asciify::asciify(dest_itr, "<p>");
-				is_open_paragraph = true;
-			}
-		}
 		if (copy_this_char_into_html){
 			compsky::asciify::asciify(dest_itr, current_c);
 		}
