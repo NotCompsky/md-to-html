@@ -210,6 +210,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	inline_div_tag_names.emplace_back("i");
 	inline_div_tag_names.emplace_back("b");
 	inline_div_tag_names.emplace_back("strong");
+	bool done_left_quote_mark = false;
 	while (true){
 		if (PRINT_DEBUG){
 			printf("%s\n", char2humanvis(*markdown)); fflush(stdout);
@@ -306,6 +307,21 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				}
 				break;
 			}
+			case '"':
+				if (done_left_quote_mark){
+					compsky::asciify::asciify(dest_itr, "“");
+					copy_this_char_into_html = false;
+				} else {
+					const char* itr = markdown;
+					while((*itr != '"') and (*itr != '\n') and (*itr != 0))
+						++itr;
+					if (likely(*itr == '"')){
+						compsky::asciify::asciify(dest_itr, "”");
+						done_left_quote_mark = true;
+						copy_this_char_into_html = false;
+					}
+				}
+				break;
 			case ']':
 				if (markdown == is_in_anchor_whose_title_ends_at){
 					compsky::asciify::asciify(dest_itr, "</a>");
