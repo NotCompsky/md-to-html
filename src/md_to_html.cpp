@@ -23,13 +23,18 @@ constexpr bool using_knitr_output = true;
 constexpr std::string_view horizontal_rule = "<hr/>";
 
 
-void close_paragraph_if_nonempty_already_open(char*& dest_itr,  const bool is_open_paragraph){
-	if (is_open_paragraph){
-		if ((dest_itr[-3] == '<') and (dest_itr[-2] == 'p') and (dest_itr[-1] == '>')){
-			dest_itr -= 3;
-		} else {
-			compsky::asciify::asciify(dest_itr, "</p>");
-		}
+unsigned rm_paragraph_if_just_opened(char*& dest_itr){
+	if ((dest_itr[-3] == '<') and (dest_itr[-2] == 'p') and (dest_itr[-1] == '>')){
+		dest_itr -= 3;
+		return 1;
+	}
+	return 0;
+}
+void close_paragraph_if_nonempty_already_open(char*& dest_itr){
+	if ((dest_itr[-3] == '<') and (dest_itr[-2] == 'p') and (dest_itr[-1] == '>')){
+		dest_itr -= 3;
+	} else {
+		compsky::asciify::asciify(dest_itr, "</p>");
 	}
 }
 
@@ -156,7 +161,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		"<body>\n"
 	);
 	bool is_in_blockquote = false;
-	bool is_open_paragraph = false;
+	unsigned n_open_paragraphs = 0;
 	unsigned dom_tag_depth_for_opening_of_paragraph = 0;
 	bool is_in_unordered_list = false;
 	const char* is_in_anchor_whose_title_ends_at = nullptr;
@@ -218,10 +223,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		){
 			if (not is_opening_of_some_node(markdown-1, noninline_div_tag_names)){
 				compsky::asciify::asciify(dest_itr, "<p>");
-				if (unlikely(is_open_paragraph)){
-					fprintf(stderr, "ERROR: is_open_paragraph already true: %.100s\n", markdown-50);
-				}
-				is_open_paragraph = true;
+				++n_open_paragraphs;
 				dom_tag_depth_for_opening_of_paragraph = open_dom_tag_names.size();
 			}
 		}
@@ -233,7 +235,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					compsky::asciify::asciify(dest_itr, "</blockquote>");
 					is_in_blockquote = false;
 				}
-				if (is_open_paragraph or is_in_unordered_list){
+				if ((n_open_paragraphs!=0) or is_in_unordered_list){
 					if (markdown[-2]=='\n')
 						--dest_itr;
 					if (
@@ -246,7 +248,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 								"</li></ul>"
 							);
 						}
-						if (is_open_paragraph){
+						if (n_open_paragraphs != 0){
 							char* _itr = dest_itr;
 							while((*_itr == ' ') or (*_itr == '\n'))
 								--_itr;
@@ -262,8 +264,8 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 									"</p>"
 								);
 							}
+							--n_open_paragraphs;
 						}
-						is_open_paragraph = false;
 						is_in_unordered_list = false;
 					}
 					if (markdown[-2]=='\n')
@@ -279,10 +281,10 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 			}
 			case '#': {
 				if (was_newline_at(markdown_buf, markdown-2)){
-					if (is_open_paragraph){
+					if (n_open_paragraphs != 0){
 						if ((dest_itr[-3] == '<') and (dest_itr[-2] == 'p') and (dest_itr[-1] == '>'))
 							dest_itr -= 3;
-						is_open_paragraph = false;
+						--n_open_paragraphs;
 					}
 					unsigned num_hashes = 1;
 					const char* itr = markdown;
@@ -485,10 +487,10 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				} else if (*itr == '/'){
 					const std::string_view last_open_tagname = open_dom_tag_names[open_dom_tag_names.size()-1];
 					if (str_eq(itr+1, last_open_tagname) and (itr[1+last_open_tagname.size()] == '>')){
-						if (is_open_paragraph){
+						if (n_open_paragraphs != 0){
 							if (open_dom_tag_names.size() == dom_tag_depth_for_opening_of_paragraph){
-								close_paragraph_if_nonempty_already_open(dest_itr, is_open_paragraph);
-								is_open_paragraph = false;
+								close_paragraph_if_nonempty_already_open(dest_itr);
+								--n_open_paragraphs;
 							}
 						}
 						
@@ -496,13 +498,6 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						markdown = itr+1 + last_open_tagname.size() + 1;
 						open_dom_tag_names.pop_back();
 						copy_this_char_into_html = false;
-						
-						if (is_open_paragraph){
-							if (open_dom_tag_names.size() == dom_tag_depth_for_opening_of_paragraph){
-								compsky::asciify::asciify(dest_itr, "</p>");
-								is_open_paragraph = false;
-							}
-						}
 					} else {
 						int itr_sz = 0;
 						while(
@@ -526,6 +521,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					if (unlikely(line_end == itr-1)){
 						log(markdown_buf, itr, "Empty blockquote", itr, 0);
 					} else {
+						n_open_paragraphs -= rm_paragraph_if_just_opened(dest_itr);
 						while(*itr == ' ')
 							++itr;
 						compsky::asciify::asciify(dest_itr, "<blockquote>");
@@ -545,6 +541,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				}
 				const char* const after_asterisks = itr;
 				if ((n_asterisks_l == 3) and was_newline_at(markdown_buf, markdown-2) and (*after_asterisks == '\n')){
+					n_open_paragraphs -= rm_paragraph_if_just_opened(dest_itr);
 					compsky::asciify::asciify(dest_itr, horizontal_rule);
 					markdown = itr+1;
 					copy_this_char_into_html = false;
@@ -556,6 +553,9 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					markdown = itr+1; // Avoid the space
 					copy_this_char_into_html = false;
 					dest_itr -= line_began_with_n_spaces;
+					if (not is_in_unordered_list){
+						n_open_paragraphs -= rm_paragraph_if_just_opened(dest_itr);
+					}
 					compsky::asciify::asciify(
 						dest_itr,
 						is_in_unordered_list ? "</li>\n<li>" : "<ul>\n<li>"
