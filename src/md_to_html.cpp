@@ -564,7 +564,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				} else if (
 					(n_asterisks_l == 1) and
 					(*after_asterisks == ' ') and
-					((markdown-2-line_began_with_n_spaces >= markdown_buf) and (*(markdown-2-line_began_with_n_spaces) == '\n'))
+					((markdown-2-line_began_with_n_spaces == markdown_buf-1) or (*(markdown-2-line_began_with_n_spaces) == '\n'))
 				){
 					markdown = itr+1; // Avoid the space
 					copy_this_char_into_html = false;
