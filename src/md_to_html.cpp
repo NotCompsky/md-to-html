@@ -581,11 +581,12 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				){
 					markdown = itr+1; // Avoid the space
 					copy_this_char_into_html = false;
-					dest_itr -= (1 + line_began_with_n_spaces);
 					const auto splds = spaces_per_list_depth.size();
+					if (splds == 0)
+						n_open_paragraphs -= rm_paragraph_if_just_opened(dest_itr);
+					dest_itr -= (1 + line_began_with_n_spaces);
 					bool is_invalid = false;
 					if (splds == 0){
-						n_open_paragraphs -= rm_paragraph_if_just_opened(dest_itr);
 						compsky::asciify::asciify(dest_itr, "<ul>");
 						spaces_per_list_depth.emplace_back(line_began_with_n_spaces);
 					} else {
