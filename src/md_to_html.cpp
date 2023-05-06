@@ -112,6 +112,13 @@ void add_tagnames_to_ls(const char* const itr,  std::vector<std::string_view>& t
 	}
 }
 
+void write_n_spaces(char*& dest_itr,  unsigned n){
+	while(n != 0){
+		compsky::asciify::asciify(dest_itr, ' ');
+		--n;
+	}
+}
+
 char* md_to_html(const char* const filepath,  char* const dest_buf){
 	compsky::os::ReadOnlyFile f(filepath);
 	if (unlikely(f.is_null())){
@@ -163,7 +170,6 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	bool is_in_blockquote = false;
 	unsigned n_open_paragraphs = 0;
 	unsigned dom_tag_depth_for_opening_of_paragraph = 0;
-	bool is_in_unordered_list = false;
 	const char* is_in_anchor_whose_title_ends_at = nullptr;
 	const char* is_in_anchor_which_ends_at = nullptr;
 	std::vector<std::string_view> open_dom_tag_names;
@@ -171,6 +177,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	std::vector<std::string_view> noninline_div_tag_names;
 	std::vector<std::string_view> inline_div_tag_names;
 	std::vector<std::string_view> warned_about_tag_names;
+	std::vector<unsigned> spaces_per_list_depth;
 	noninline_div_tag_names.emplace_back("br");
 	noninline_div_tag_names.emplace_back("hr");
 	noninline_div_tag_names.emplace_back("div");
@@ -236,18 +243,25 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					compsky::asciify::asciify(dest_itr, "</blockquote>");
 					is_in_blockquote = false;
 				}
-				if ((n_open_paragraphs!=0) or is_in_unordered_list){
+				if ((n_open_paragraphs!=0) or (spaces_per_list_depth.size()!=0)){
 					if (markdown[-2]=='\n')
 						--dest_itr;
 					if (
 						(markdown[-1]==0) or
 						(markdown[-2]=='\n')
 					){
-						if (is_in_unordered_list){
+						if (spaces_per_list_depth.size()!=0){
+							for (unsigned i = 0;  i < spaces_per_list_depth.size();  ++i){
+								compsky::asciify::asciify(
+									dest_itr,
+									"</li>"
+								);
+							}
 							compsky::asciify::asciify(
 								dest_itr,
-								"</li></ul>"
+								"</ul>"
 							);
+							spaces_per_list_depth.clear();
 						}
 						if (n_open_paragraphs != 0){
 							char* _itr = dest_itr;
@@ -267,7 +281,6 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 							}
 							--n_open_paragraphs;
 						}
-						is_in_unordered_list = false;
 					}
 					if (markdown[-2]=='\n')
 						compsky::asciify::asciify(dest_itr, '\n');
@@ -568,18 +581,40 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				){
 					markdown = itr+1; // Avoid the space
 					copy_this_char_into_html = false;
-					dest_itr -= line_began_with_n_spaces;
-					if (not is_in_unordered_list){
+					dest_itr -= (1 + line_began_with_n_spaces);
+					const auto splds = spaces_per_list_depth.size();
+					bool is_invalid = false;
+					if (splds == 0){
 						n_open_paragraphs -= rm_paragraph_if_just_opened(dest_itr);
+						compsky::asciify::asciify(dest_itr, "<ul>");
+						spaces_per_list_depth.emplace_back(line_began_with_n_spaces);
+					} else {
+						if (spaces_per_list_depth[splds-1] < line_began_with_n_spaces){
+							spaces_per_list_depth.emplace_back(line_began_with_n_spaces);
+						} else {
+							bool matched = false;
+							for (unsigned i = splds;  i != 0;  ){
+								--i;
+								if (spaces_per_list_depth[i] == line_began_with_n_spaces){
+									for (unsigned j = i;  j < splds-1;  ++j){
+										compsky::asciify::asciify(dest_itr, "</li>");
+										spaces_per_list_depth.pop_back();
+									}
+									compsky::asciify::asciify(dest_itr, "</li>");
+									matched = true;
+									break;
+								}
+							}
+							if (unlikely(not matched)){
+								is_invalid = true;
+								fprintf(stderr, "ERROR: Bad spacing in list at '%.3s': %.100s\n", markdown-1, markdown-50);
+							}
+						}
 					}
-					compsky::asciify::asciify(
-						dest_itr,
-						is_in_unordered_list ? "</li>\n<li>" : "<ul>\n<li>"
-					);
-					is_in_unordered_list = true;
-					while(line_began_with_n_spaces != 0){
-						compsky::asciify::asciify(dest_itr, ' ');
-						--line_began_with_n_spaces;
+					if (likely(not is_invalid)){
+						compsky::asciify::asciify(dest_itr, "\n");
+						write_n_spaces(dest_itr, line_began_with_n_spaces);
+						compsky::asciify::asciify(dest_itr, "<li>");
 					}
 				} else {
 					if ((*after_asterisks != ' ') and (n_asterisks_l <= emphasis_max)){
@@ -748,7 +783,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						line_began_with_n_spaces = 0;
 						markdown = itr;
 					} else {
-						if (not is_in_unordered_list){
+						if (spaces_per_list_depth.size() == 0){
 							if (itr[0] != '<')
 								fprintf(stderr, "ERROR: Line starts with ' ' and not in <ul>: >>>%.100s<<<\n", markdown-1);
 						} else {
