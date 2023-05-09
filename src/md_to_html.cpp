@@ -378,7 +378,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 			case '[': {
 				const char* const title_end = str_if_ends_with__before__pair_up_with(markdown, ']', '\n', '[');
 				if ((likely(title_end != markdown-1)) and (likely(title_end[2] == '('))){
-					const char* const link_end = str_if_ends_with__before(title_end+3, ')', '\n');
+					const char* const link_end = str_if_ends_with__before__allowescapes(title_end+3, ')', '\n');
 					if (likely(link_end != title_end+3-1)){
 						if (likely(is_in_anchor_whose_title_ends_at == nullptr)){
 							compsky::asciify::asciify(dest_itr, "<a href=\"", mkview(title_end+3,link_end+1), "\">");
@@ -388,6 +388,8 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						} else {
 							log(markdown_buf, markdown-1, "[link]() within [link]()", markdown-1, compsky::utils::ptrdiff(link_end+1,markdown-1));
 						}
+					} else if (str_if_ends_with__before(title_end+3, ')', '\n') != title_end+3-1){
+						fprintf(stderr, "WARNING: Possibly invalid [](link) URL syntax: %.200s\n", title_end);
 					}
 				}
 				break;

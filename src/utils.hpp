@@ -51,6 +51,24 @@ const char* str_if_ends_with__before(const char* const init,  const char d,  con
 	}
 	return init-1;
 }
+const char* str_if_ends_with__before__allowescapes(const char* const init,  const char d,  const char before1){
+	// e.g. (init,d,before1)==("foo bar]",']','\n') => position before ']'
+	const char* itr = init;
+	while(*itr != 0){
+		if (*itr == before1){
+			break;
+		}
+		if (*itr == '\\'){
+			itr += 2;
+			continue;
+		}
+		if (*itr == d){
+			return itr-1;
+		}
+		++itr;
+	}
+	return init-1;
+}
 const char* str_if_ends_with__before__pair_up_with(const char* const init,  const char d,  const char before1,  const char pair_with){
 	// e.g. (init,d,before1)==("foo [bar] ree]",']','\n','[') => position after "ree" before ']'
 	const char* itr = init;
