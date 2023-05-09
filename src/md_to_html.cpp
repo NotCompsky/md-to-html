@@ -325,6 +325,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 				if (done_left_quote_mark){
 					compsky::asciify::asciify(dest_itr, "“");
 					copy_this_char_into_html = false;
+					done_left_quote_mark = false;
 				} else {
 					const char* itr = markdown;
 					while((*itr != '"') and (*itr != '\n') and (*itr != 0))
