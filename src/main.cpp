@@ -55,10 +55,10 @@ int main(int argc,  const char* const* argv){
 	}
 	if (likely(not any_errors) and likely((argc >= 1) and (argc <= 2))){
 		int out_fd = 1;
-		if (argc-PRINT_DEBUG == 3){
+		if (argc == 2){
 			out_fd = open(argv[1], O_WRONLY|O_CREAT, 0644);
 		}
-		char* const html_buf = reinterpret_cast<char*>(malloc(1024*1024 * 20));
+		char* const html_buf = reinterpret_cast<char*>(malloc(2*HALF_BUF_SZ));
 		if (likely(html_buf != nullptr)){
 			char* const html_end = md_to_html(argv[0], html_buf);
 			write(out_fd, html_buf, compsky::utils::ptrdiff(html_end,html_buf));

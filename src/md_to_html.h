@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <compsky/os/metadata.hpp>
 
+constexpr std::size_t HALF_BUF_SZ = 1024*1024*50;
+
 constexpr
 bool startswithreplace(const char* const str){
 	return (
@@ -37,6 +39,7 @@ struct Filename {
 	: n_uses(0)
 	{
 		std::size_t fname_len = strlen(_name);
+		memcpy(filepath+dirpath_len, _name, fname_len+1);
 		if (unlikely(not startswithreplace(_name))){
 			fprintf(stderr, "WARNING: File does not begin with R_E_P_L_A_C_E_: %.*s\n", (int)fname_len, _name);
 		} else {
@@ -45,7 +48,6 @@ struct Filename {
 		}
 		
 		char* const _buf1 = reinterpret_cast<char*>(malloc(fname_len));
-		memcpy(filepath+dirpath_len, _name, fname_len+1);
 		memcpy(_buf1, _name, fname_len);
 		this->name = std::string_view(_buf1, fname_len);
 		
@@ -53,6 +55,7 @@ struct Filename {
 		char* _buf = reinterpret_cast<char*>(malloc(f_sz));
 		const int fd = open(filepath, O_RDONLY);
 		read(fd, _buf, f_sz);
+		close(fd);
 		this->contents = std::string_view(_buf, f_sz);
 	}
 	void deepcopy(const Filename& othr){

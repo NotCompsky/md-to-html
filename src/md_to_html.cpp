@@ -24,7 +24,7 @@ constexpr std::string_view horizontal_rule = "<hr/>";
 const char* blockquote_tagname = "blockquote";
 std::vector<Filename> replacewith_filenames;
 
-bool replace_strings(char*& dest_itr,  const char*& markdown){
+bool replace_strings(char*& dest_itr,  char*& markdown){
 	if (unlikely(startswithreplace(markdown))){ // R_E_P_L_A_C_E_
 		for (Filename& filename : replacewith_filenames){
 			if (str_eq(markdown+14, filename.name)){
@@ -87,6 +87,8 @@ void add_tagnames_to_ls(const char* const itr,  std::vector<std::string_view>& t
 	fprintf(stderr, "FOUND %.*s\n", (int)compsky::utils::ptrdiff(_enddd,_start), _start);
 	while(_start != _enddd){
 		++_start;
+		if (unlikely(startswithreplace(_start)))
+			_start += 14;
 		switch(*_start){
 			case ' ':
 			case '\n':
@@ -145,7 +147,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	f.read_into_buf(markdown_buf, f.size());
 	markdown_buf[f.size()] = 0;
 	
-	char* dest_itr = dest_buf;
+	char* dest_itr = dest_buf + HALF_BUF_SZ;
 	const char* markdown = markdown_buf;
 	std::string_view titlestr;
 	if ((markdown[0]=='-')and(markdown[1]=='-')and(markdown[2]=='-')and(markdown[3]=='\n')){
@@ -237,10 +239,6 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	while (true){
 		if (PRINT_DEBUG){
 			printf("%s\n", char2humanvis(*markdown)); fflush(stdout);
-		}
-		if (unlikely(replace_strings(dest_itr, markdown))){
-			++markdown;
-			continue;
 		}
 		++markdown;
 		bool copy_this_char_into_html = true;
@@ -393,8 +391,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					markdown = itr;
 					copy_this_char_into_html = false;
 				} else if (  (itr[0]=='s') and (itr[1]=='c') and (itr[2]=='r') and (itr[3]=='i') and (itr[4]=='p') and (itr[5]=='t') and ((itr[6]=='>') or (itr[6]==' '))  ){ // <script></script>
-					itr += 7;
-					compsky::asciify::asciify(dest_itr, std::string_view(markdown-1,8));
+					itr += 7+9;
 					while(
 						(itr[-9]!='<') or
 						(itr[-8]!='/') or
@@ -406,15 +403,13 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						(itr[-2]!='t') or
 						(itr[-1]!='>')
 					){
-						if (likely(not replace_strings(dest_itr, itr)))
-							compsky::asciify::asciify(dest_itr, *itr);
 						++itr;
 					}
+					compsky::asciify::asciify(dest_itr, mkview(markdown-1,itr));
 					markdown = itr;
 					copy_this_char_into_html = false;
 				} else if (  (itr[0]=='s') and (itr[1]=='t') and (itr[2]=='y') and (itr[3]=='l') and (itr[4]=='e') and ((itr[5]=='>') or (itr[5]==' '))  ){ // <style></style>
-					itr += 6;
-					compsky::asciify::asciify(dest_itr, std::string_view(markdown-1,7));
+					itr += 6+8;
 					while(
 						(itr[-8]!='<') or
 						(itr[-7]!='/') or
@@ -496,13 +491,17 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						)){ // display:inline-block; // TODO: Improve? but why bother if it works for rpill
 							add_tagnames_to_ls(itr-24, inline_div_tag_names);
 						}
-						if (likely(not replace_strings(dest_itr, itr)))
-							compsky::asciify::asciify(dest_itr, *itr);
 						++itr;
 					}
+					compsky::asciify::asciify(dest_itr, mkview(markdown-1,itr));
 					markdown = itr;
 					copy_this_char_into_html = false;
-				} else if ((*itr >= 'a') and (*itr <= 'z')){
+				} else if (
+					((*itr >= 'a') and (*itr <= 'z')) or
+					(unlikely(startswithreplace(itr)))
+				){
+					if (unlikely(startswithreplace(itr)))
+						itr += 14;
 					while (
 						((*itr >= 'a') and (*itr <= 'z')) or
 						((*itr >= '0') and (*itr <= '9')) or
@@ -838,6 +837,17 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		fflush(stderr);
 		abort();
 	}
-	compsky::asciify::asciify(dest_itr, "</body></html>");
-	return dest_itr;
+	compsky::asciify::asciify(dest_itr, "</body></html>", '\0');
+	
+	{
+		char* dest_itr1 = dest_buf + HALF_BUF_SZ;
+		char* dest_itr2 = dest_buf;
+		while(*dest_itr1 != 0){
+			if (likely(not replace_strings(dest_itr2, dest_itr1))){
+				compsky::asciify::asciify(dest_itr2, *dest_itr1);
+			}
+			++dest_itr1;
+		}
+		return dest_itr2;
+	}
 }
