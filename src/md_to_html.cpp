@@ -661,7 +661,6 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						if (likely(n_asterisks_r == n_asterisks_l)){
 							// TODO: Deal with [links](https://...)
 							compsky::asciify::asciify(dest_itr, emphasis_open[n_asterisks_l-1], mkview(start_of_emphasised_text,itr+1-n_asterisks_r), emphasis_close[n_asterisks_l-1]);
-							fprintf(stderr, "from */**: %.*s\n", (int)(compsky::utils::ptrdiff(itr,start_of_emphasised_text)+1-n_asterisks_r), start_of_emphasised_text);
 							markdown = itr+1;
 							copy_this_char_into_html = false;
 						}
