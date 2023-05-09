@@ -21,7 +21,7 @@ bool str_eq(const char* a,  const std::string_view& b){
 	for (std::size_t i = 0;  i < b.size();  ++i){
 		rc &= (a[i] == b.at(i));
 		if (*a == 0)
-			break;
+			return false;
 	}
 	return rc;
 }
