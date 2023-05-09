@@ -21,6 +21,7 @@ constexpr const char* emphasis_close[2] = {
 };
 constexpr bool using_knitr_output = true;
 constexpr std::string_view horizontal_rule = "<hr/>";
+const char* blockquote_tagname = "blockquote";
 
 
 unsigned rm_paragraph_if_just_opened(char*& dest_itr){
@@ -193,7 +194,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	noninline_div_tag_names.emplace_back("h8");
 	noninline_div_tag_names.emplace_back("h9");
 	noninline_div_tag_names.emplace_back("h10");
-	noninline_div_tag_names.emplace_back("blockquote");
+	noninline_div_tag_names.emplace_back(blockquote_tagname);
 	noninline_div_tag_names.emplace_back("ul");
 	noninline_div_tag_names.emplace_back("li");
 	noninline_div_tag_names.emplace_back("canvas");
@@ -240,7 +241,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 			case 0:
 			case '\n': {
 				if (is_in_blockquote){
-					compsky::asciify::asciify(dest_itr, "</blockquote>");
+					compsky::asciify::asciify(dest_itr, "</", blockquote_tagname, ">");
 					is_in_blockquote = false;
 				}
 				if ((n_open_paragraphs!=0) or (spaces_per_list_depth.size()!=0)){
@@ -553,7 +554,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						n_open_paragraphs -= rm_paragraph_if_just_opened(dest_itr);
 						while(*itr == ' ')
 							++itr;
-						compsky::asciify::asciify(dest_itr, "<blockquote>");
+						compsky::asciify::asciify(dest_itr, "<",blockquote_tagname,">");
 						markdown = itr;
 						copy_this_char_into_html = false;
 						is_in_blockquote = true;
