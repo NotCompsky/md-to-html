@@ -592,6 +592,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						spaces_per_list_depth.emplace_back(line_began_with_n_spaces);
 					} else {
 						if (spaces_per_list_depth[splds-1] < line_began_with_n_spaces){
+							compsky::asciify::asciify(dest_itr, "<ul>");
 							spaces_per_list_depth.emplace_back(line_began_with_n_spaces);
 						} else {
 							bool matched = false;
@@ -599,7 +600,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 								--i;
 								if (spaces_per_list_depth[i] == line_began_with_n_spaces){
 									for (unsigned j = i;  j < splds-1;  ++j){
-										compsky::asciify::asciify(dest_itr, "</li>");
+										compsky::asciify::asciify(dest_itr, "</li></ul>");
 										spaces_per_list_depth.pop_back();
 									}
 									compsky::asciify::asciify(dest_itr, "</li>");
