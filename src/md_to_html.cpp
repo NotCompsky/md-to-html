@@ -22,6 +22,21 @@ constexpr const char* emphasis_close[2] = {
 constexpr bool using_knitr_output = true;
 constexpr std::string_view horizontal_rule = "<hr/>";
 const char* blockquote_tagname = "blockquote";
+std::vector<Filename> replacewith_filenames;
+
+bool replace_strings(char*& dest_itr,  const char*& markdown){
+	if (unlikely(startswithreplace(markdown))){ // R_E_P_L_A_C_E_
+		for (Filename& filename : replacewith_filenames){
+			if (str_eq(markdown+14, filename.name)){
+				++filename.n_uses;
+				compsky::asciify::asciify(dest_itr, filename.contents);
+				markdown += 14 + filename.name.size() - 1;
+				return true;
+			}
+		}
+	}
+	return false;
+}
 
 
 unsigned rm_paragraph_if_just_opened(char*& dest_itr){
@@ -223,17 +238,20 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 		if (PRINT_DEBUG){
 			printf("%s\n", char2humanvis(*markdown)); fflush(stdout);
 		}
+		if (unlikely(replace_strings(dest_itr, markdown))){
+			++markdown;
+			continue;
+		}
 		++markdown;
 		bool copy_this_char_into_html = true;
 		bool should_break_out = false;
-		if (
-			((markdown[-2] == '\n') and (markdown[-3] == '\n')) or
-			(markdown-2 == markdown_buf)
-		){
-			if (not is_opening_of_some_node(markdown-1, noninline_div_tag_names)){
-				compsky::asciify::asciify(dest_itr, "<p>");
-				++n_open_paragraphs;
-				dom_tag_depth_for_opening_of_paragraph = open_dom_tag_names.size();
+		if (likely(markdown > markdown_buf+2)){
+			if (unlikely((markdown[-2] == '\n') and (markdown[-3] == '\n'))){
+				if (not is_opening_of_some_node(markdown-1, noninline_div_tag_names)){
+					compsky::asciify::asciify(dest_itr, "<p>");
+					++n_open_paragraphs;
+					dom_tag_depth_for_opening_of_paragraph = open_dom_tag_names.size();
+				}
 			}
 		}
 		const char current_c = markdown[-1];
@@ -375,7 +393,8 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					markdown = itr;
 					copy_this_char_into_html = false;
 				} else if (  (itr[0]=='s') and (itr[1]=='c') and (itr[2]=='r') and (itr[3]=='i') and (itr[4]=='p') and (itr[5]=='t') and ((itr[6]=='>') or (itr[6]==' '))  ){ // <script></script>
-					itr += 7+9;
+					itr += 7;
+					compsky::asciify::asciify(dest_itr, std::string_view(markdown-1,8));
 					while(
 						(itr[-9]!='<') or
 						(itr[-8]!='/') or
@@ -386,13 +405,16 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						(itr[-3]!='p') or
 						(itr[-2]!='t') or
 						(itr[-1]!='>')
-					)
+					){
+						if (likely(not replace_strings(dest_itr, itr)))
+							compsky::asciify::asciify(dest_itr, *itr);
 						++itr;
-					compsky::asciify::asciify(dest_itr, mkview(markdown-1,itr));
+					}
 					markdown = itr;
 					copy_this_char_into_html = false;
 				} else if (  (itr[0]=='s') and (itr[1]=='t') and (itr[2]=='y') and (itr[3]=='l') and (itr[4]=='e') and ((itr[5]=='>') or (itr[5]==' '))  ){ // <style></style>
-					itr += 6+8;
+					itr += 6;
+					compsky::asciify::asciify(dest_itr, std::string_view(markdown-1,7));
 					while(
 						(itr[-8]!='<') or
 						(itr[-7]!='/') or
@@ -474,9 +496,10 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						)){ // display:inline-block; // TODO: Improve? but why bother if it works for rpill
 							add_tagnames_to_ls(itr-24, inline_div_tag_names);
 						}
+						if (likely(not replace_strings(dest_itr, itr)))
+							compsky::asciify::asciify(dest_itr, *itr);
 						++itr;
 					}
-					compsky::asciify::asciify(dest_itr, mkview(markdown-1,itr));
 					markdown = itr;
 					copy_this_char_into_html = false;
 				} else if ((*itr >= 'a') and (*itr <= 'z')){
