@@ -352,7 +352,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 			}
 			case '"':
 				if (done_left_quote_mark){
-					compsky::asciify::asciify(dest_itr, "“");
+					compsky::asciify::asciify(dest_itr, "”");
 					copy_this_char_into_html = false;
 					done_left_quote_mark = false;
 				} else {
@@ -360,7 +360,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 					while((*itr != '"') and (*itr != '\n') and (*itr != 0))
 						++itr;
 					if (likely(*itr == '"')){
-						compsky::asciify::asciify(dest_itr, "”");
+						compsky::asciify::asciify(dest_itr, "“");
 						done_left_quote_mark = true;
 						copy_this_char_into_html = false;
 					}
