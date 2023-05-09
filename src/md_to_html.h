@@ -71,10 +71,5 @@ struct Filename {
 		this->deepcopy(othr);
 	}
 	~Filename(){}
-	void deconstruct() const {
-		if (this->n_uses == 0)
-			fprintf(stderr, "%u uses: R_E_P_L_A_C_E_%.*s\n\t%.*s\n", this->n_uses, (int)name.size(), name.data(), (int)contents.size(), contents.data());
-		free(const_cast<char*>(this->contents.data()));
-		free(const_cast<char*>(this->name.data()));
-	}
+	void deconstruct() const;
 };

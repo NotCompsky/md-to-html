@@ -7,6 +7,7 @@
 
 extern const char* blockquote_tagname;
 bool PRINT_DEBUG = false;
+bool IS_VERBOSE = false;
 extern std::vector<Filename> replacewith_filenames;
 
 int main(int argc,  const char* const* argv){
@@ -22,6 +23,9 @@ int main(int argc,  const char* const* argv){
 				break;
 			case 'd':
 				PRINT_DEBUG = true;
+				break;
+			case 'v':
+				IS_VERBOSE = true;
 				break;
 			case 'R': {
 				const char* const dirpath = *(++argv);
@@ -78,9 +82,12 @@ int main(int argc,  const char* const* argv){
 		"		Default is \"blockquote\"\n"
 		"	-d\n"
 		"		Debug\n"
+		"	-v\n"
+		"		Verbose\n"
 		"	-R [/path/to/directory]\n"
 		"		Directory containing files.\n"
 		"		For each file named {fname}, if a string \"R_E_P_L_A_C_E_{fname}\" is encountered, it is replaced by the file's contents.\n"
+		"		Can screw up things if done in strange places. <R_E_P_L_A_C_E_stuff> works but not <blahR_E_P_L_A_C_E_stuff>\n"
 	;
 	write(2, errmsg, std::char_traits<char>::length(errmsg));
 	return 1;

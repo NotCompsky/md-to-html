@@ -9,6 +9,17 @@
 #include "utils.hpp"
 
 
+extern bool IS_VERBOSE;
+
+
+void Filename::deconstruct() const {
+	if ((this->n_uses == 0) and (IS_VERBOSE))
+		fprintf(stderr, "%u uses: R_E_P_L_A_C_E_%.*s\n\t%.*s\n", this->n_uses, (int)name.size(), name.data(), (int)contents.size(), contents.data());
+	free(const_cast<char*>(this->contents.data()));
+	free(const_cast<char*>(this->name.data()));
+}
+
+
 extern bool PRINT_DEBUG;
 constexpr std::size_t emphasis_max = 2;
 constexpr const char* emphasis_open[2] = {
@@ -34,6 +45,8 @@ bool replace_strings(char*& dest_itr,  char*& markdown){
 				return true;
 			}
 		}
+		[[unlikely]]
+		fprintf(stderr, "WARNING: Not replaced: %.30s...\n", markdown);
 	}
 	return false;
 }
