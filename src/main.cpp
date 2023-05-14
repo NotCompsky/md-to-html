@@ -44,7 +44,7 @@ int main(int argc,  const char* const* argv){
 				} else {
 					struct dirent* ent;
 					while((ent = readdir(dir))){
-						if (likely(ent->d_type == DT_REG)){
+						if (likely((ent->d_type == DT_REG) or (ent->d_type == DT_LNK))){
 							replacewith_filenames.emplace_back(fullpath, dirpath_len, ent->d_name);
 						}
 					}
