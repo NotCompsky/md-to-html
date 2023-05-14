@@ -10,6 +10,7 @@
 
 
 extern bool IS_VERBOSE;
+extern bool INCLUDE_COMMENT_NODES;
 
 
 void Filename::deconstruct() const {
@@ -403,6 +404,8 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 						(itr[-3]!='-') or (itr[-2]!='-') or (itr[-1]!='>')
 					)
 						++itr;
+					if (INCLUDE_COMMENT_NODES)
+						compsky::asciify::asciify(dest_itr, mkview(markdown-1,itr)); // Yes, copy comment HTML into final output - helps detect errors in R
 					markdown = itr;
 					copy_this_char_into_html = false;
 				} else if (  (itr[0]=='s') and (itr[1]=='c') and (itr[2]=='r') and (itr[3]=='i') and (itr[4]=='p') and (itr[5]=='t') and ((itr[6]=='>') or (itr[6]==' '))  ){ // <script></script>

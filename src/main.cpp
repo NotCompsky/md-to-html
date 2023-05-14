@@ -9,6 +9,7 @@
 extern const char* blockquote_tagname;
 bool PRINT_DEBUG = false;
 bool IS_VERBOSE = false;
+bool INCLUDE_COMMENT_NODES = false;
 extern std::vector<Filename> replacewith_filenames;
 
 int main(int argc,  const char* const* argv){
@@ -21,6 +22,9 @@ int main(int argc,  const char* const* argv){
 			case 'b':
 				blockquote_tagname = *(++argv);
 				--argc;
+				break;
+			case 'c':
+				INCLUDE_COMMENT_NODES = true;
 				break;
 			case 'd':
 				PRINT_DEBUG = true;
@@ -88,6 +92,8 @@ int main(int argc,  const char* const* argv){
 		"		Debug\n"
 		"	-v\n"
 		"		Verbose\n"
+		"	-c\n"
+		"		Include <!-- comment nodes --> (default FALSE)\n"
 		"	-R [/path/to/directory]\n"
 		"		Directory containing files.\n"
 		"		For each file named {fname}, if a string \"R_E_P_L_A_C_E_{fname}\" is encountered, it is replaced by the file's contents.\n"
