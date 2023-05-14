@@ -4,6 +4,7 @@
 #include <compsky/macros/likely.hpp>
 #include <string>
 #include <compsky/os/write.hpp> // for write
+#include <algorithm>
 
 extern const char* blockquote_tagname;
 bool PRINT_DEBUG = false;
@@ -47,6 +48,9 @@ int main(int argc,  const char* const* argv){
 							replacewith_filenames.emplace_back(fullpath, dirpath_len, ent->d_name);
 						}
 					}
+					std::sort(replacewith_filenames.begin(), replacewith_filenames.end(), [](const Filename& f1,  const Filename& f2){
+						return f1.name.size() > f2.name.size();
+					}); // Place largest names first - so R_E_P_L_A_C_E_xy comes before R_E_P_L_A_C_E_x
 				}
 				break;
 			}
