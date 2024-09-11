@@ -210,6 +210,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	std::vector<std::string_view> inline_div_tag_names;
 	std::vector<std::string_view> warned_about_tag_names;
 	std::vector<unsigned> spaces_per_list_depth;
+	noninline_div_tag_names.reserve(23+10);
 	noninline_div_tag_names.emplace_back("br");
 	noninline_div_tag_names.emplace_back("hr");
 	noninline_div_tag_names.emplace_back("div");
@@ -233,6 +234,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	noninline_div_tag_names.emplace_back("p");
 	noninline_div_tag_names.emplace_back("table");
 	noninline_div_tag_names.emplace_back("tr");
+	inline_div_tag_names.reserve(17+10);
 	inline_div_tag_names.emplace_back("svg");
 	inline_div_tag_names.emplace_back("circle");
 	inline_div_tag_names.emplace_back("path");
@@ -249,6 +251,7 @@ char* md_to_html(const char* const filepath,  char* const dest_buf){
 	inline_div_tag_names.emplace_back("i");
 	inline_div_tag_names.emplace_back("b");
 	inline_div_tag_names.emplace_back("strong");
+	inline_div_tag_names.emplace_back("label");
 	bool done_left_quote_mark = false;
 	while (true){
 		if (PRINT_DEBUG){
