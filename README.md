@@ -1,0 +1,1 @@
+Convert relatively simple RMarkDown documents (.rmd) to HTML. It can handle huge documents which alternatives (such as Pandoc) struggle with, and much faster. It has only limited capabilities, but you can easily extend them by editing or contributing to this project.
